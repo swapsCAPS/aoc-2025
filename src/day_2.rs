@@ -1,6 +1,6 @@
 use std::fs;
 
-pub fn run() {
+pub fn part_1() {
     let binding = fs::read_to_string("inputs/day-2.txt").expect("Could not read file");
     let content = binding.trim();
 
