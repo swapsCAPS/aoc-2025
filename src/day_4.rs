@@ -118,7 +118,6 @@ pub fn part_2() {
                 }
 
                 if count < 4 {
-                    println!("{}:{}: {}", y, x, grid[y][x]);
                     grid[y][x] = false;
                     result += 1;
                 }
