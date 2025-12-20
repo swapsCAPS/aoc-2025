@@ -7,5 +7,5 @@ mod day_6;
 mod util;
 
 fn main() {
-    day_6::part_1();
+    day_6::part_2();
 }
