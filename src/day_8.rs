@@ -86,6 +86,77 @@ pub fn part_1() {
     println!("{}", result)
 }
 
+pub fn part_2() {
+    let binding = fs::read_to_string("inputs/day-8.txt").expect("Could not read file");
+    let content = binding.trim();
+
+    let points: Vec<Point> = content
+        .lines()
+        .map(|l| l.trim())
+        .map(|l| l.split(','))
+        .map(|v| v.map(|s| s.parse::<i128>().expect("could not parse")))
+        .map(|v| v.collect::<Vec<i128>>())
+        .map(|v| (v[0], v[1], v[2]))
+        .collect();
+
+    let mut distances: Vec<(Point, Point, f64)> = points
+        .iter()
+        .flat_map(|op| {
+            points
+                .iter()
+                .filter(move |ip| op != *ip)
+                .map(|ip| (*op, *ip, get_dist(op, ip)))
+        })
+        .collect();
+
+    distances.sort_by(|a, b| a.2.total_cmp(&b.2));
+
+    distances = distances
+        .iter()
+        .enumerate()
+        .filter(|(i, _)| i % 2 == 0)
+        .map(|(_, d)| *d)
+        .collect();
+
+    let mut circuits: Vec<HashSet<Point>> = Vec::new();
+
+    let mut i = 0;
+    let result = loop {
+        let c = circuits.clone();
+        let d = distances[i];
+
+        let existing_circuits: Vec<(usize, &HashSet<Point>)> = c
+            .iter()
+            .enumerate()
+            .filter(|(_, c)| c.contains(&d.0) || c.contains(&d.1))
+            .collect();
+
+        if existing_circuits.len() > 0 {
+            circuits[existing_circuits[0].0].insert(d.0);
+            circuits[existing_circuits[0].0].insert(d.1);
+
+            if existing_circuits.len() > 1 {
+                for (idx, points) in existing_circuits.iter().skip(1) {
+                    for p in points.iter() {
+                        circuits[existing_circuits[0].0].insert(*p);
+                    }
+                    circuits.remove(*idx);
+                }
+            }
+        } else {
+            circuits.push(HashSet::from_iter(vec![d.0, d.1]));
+        }
+
+        i += 1;
+
+        if circuits[0].len() == 1000 {
+            break d.0.0 * d.1.0;
+        }
+    };
+
+    println!("{}", result)
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::HashSet;
