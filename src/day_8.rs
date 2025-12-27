@@ -2,6 +2,11 @@ use std::{collections::HashSet, fs};
 
 type Point = (i128, i128, i128);
 
+fn get_dist(p: &Point, q: &Point) -> f64 {
+    let d = (p.0 - q.0).pow(2) + (p.1 - q.1).pow(2) + (p.2 - q.2).pow(2);
+    (d as f64).sqrt()
+}
+
 pub fn part_1() {
     let binding = fs::read_to_string("inputs/day-8.txt").expect("Could not read file");
     let content = binding.trim();
@@ -15,13 +20,7 @@ pub fn part_1() {
         .map(|v| (v[0], v[1], v[2]))
         .collect();
 
-    fn get_dist(p: &Point, q: &Point) -> i128 {
-        // Removed sqrt as per Reddit hint
-        let d = (p.0 - q.0).pow(2) + (p.1 - q.1).pow(2) + (p.2 - q.2).pow(2);
-        d
-    }
-
-    let mut distances: Vec<(Point, Point, i128)> = points
+    let mut distances: Vec<(Point, Point, f64)> = points
         .iter()
         .flat_map(|op| {
             points
@@ -31,7 +30,7 @@ pub fn part_1() {
         })
         .collect();
 
-    distances.sort_by(|a, b| a.2.cmp(&b.2));
+    distances.sort_by(|a, b| a.2.total_cmp(&b.2));
 
     distances = distances
         .iter()
@@ -45,27 +44,90 @@ pub fn part_1() {
     }
 
     let mut circuits: Vec<HashSet<Point>> = Vec::new();
-    for (i, d) in distances.iter().enumerate().take(10) {
+
+    for (i, d) in distances.iter().enumerate().take(1000) {
         println!("{} {:?}", i + 1, d);
 
-        let existing_idx = circuits
-            .iter()
-            .position(|c| c.contains(&d.0) || c.contains(&d.1));
+        let c = circuits.clone();
 
-        if let Some(idx) = existing_idx {
-            circuits[idx].insert(d.0);
-            circuits[idx].insert(d.1);
+        let existing_circuits: Vec<(usize, &HashSet<Point>)> = c
+            .iter()
+            .enumerate()
+            .filter(|(_, c)| c.contains(&d.0) || c.contains(&d.1))
+            .collect();
+
+        if existing_circuits.len() > 0 {
+            circuits[existing_circuits[0].0].insert(d.0);
+            circuits[existing_circuits[0].0].insert(d.1);
+
+            // Join circuits if needed!
+            // o boy have I been stuck on this :')
+            if existing_circuits.len() > 1 {
+                for (idx, points) in existing_circuits.iter().skip(1) {
+                    for p in points.iter() {
+                        circuits[existing_circuits[0].0].insert(*p);
+                    }
+                    circuits.remove(*idx);
+                }
+            }
         } else {
-            circuits.push(HashSet::from_iter(vec![d.0, d.1]))
-        }
-        for c in &circuits {
-            println!("{:?}", c)
+            circuits.push(HashSet::from_iter(vec![d.0, d.1]));
         }
         println!("");
     }
 
+    circuits.sort_by(|a, b| a.len().cmp(&b.len()));
+    circuits.reverse();
+
     println!("");
     for c in &circuits {
-        println!("{:?}", c)
+        println!("{} {:?}", c.len(), c)
+    }
+
+    let result = circuits
+        .iter()
+        .skip(1)
+        .take(2)
+        .fold(circuits[0].len(), |acc, c| acc * c.len());
+
+    println!("{}", result)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashSet;
+
+    #[test]
+    fn it_works() {
+        let d = super::get_dist(&(0, 0, 0), &(99999, 0, 0));
+
+        assert_eq!(d, 99999.0)
+    }
+
+    #[test]
+    fn it_works_2() {
+        let d = super::get_dist(&(99999, 0, 0), &(99999, 0, 0));
+
+        assert_eq!(d, 0.0)
+    }
+
+    #[test]
+    fn it_works_3() {
+        let d = super::get_dist(&(99999, 0, 99999), &(0, 0, 0));
+        let e = super::get_dist(&(99999, 99999, 0), &(0, 0, 0));
+
+        assert_eq!(d, 141419.94202374713);
+        assert_eq!(e, 141419.94202374713);
+    }
+
+    #[test]
+    fn it_works_4() {
+        let mut set = HashSet::new();
+
+        set.insert((99999, 99999, 0));
+        set.insert((99999, 99999, 0));
+        set.insert((99999, 99999, 1));
+
+        assert_eq!(set.len(), 2);
     }
 }
