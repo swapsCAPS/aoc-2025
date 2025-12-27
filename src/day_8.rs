@@ -39,15 +39,9 @@ pub fn part_1() {
         .map(|(_, d)| *d)
         .collect();
 
-    for d in distances.iter().take(20) {
-        println!("{:?}", d);
-    }
-
     let mut circuits: Vec<HashSet<Point>> = Vec::new();
 
-    for (i, d) in distances.iter().enumerate().take(1000) {
-        println!("{} {:?}", i + 1, d);
-
+    for d in distances.iter().take(1000) {
         let c = circuits.clone();
 
         let existing_circuits: Vec<(usize, &HashSet<Point>)> = c
@@ -73,7 +67,6 @@ pub fn part_1() {
         } else {
             circuits.push(HashSet::from_iter(vec![d.0, d.1]));
         }
-        println!("");
     }
 
     circuits.sort_by(|a, b| a.len().cmp(&b.len()));
