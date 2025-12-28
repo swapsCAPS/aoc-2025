@@ -16,8 +16,7 @@ pub fn part_1() {
     let result = points.iter().fold(0, |acc, (y, x)| {
         let max = points
             .iter()
-            .filter(|(iy, ix)| iy >= y && ix >= x)
-            .map(|(iy, ix)| (iy - y + 1) * (ix - x + 1))
+            .map(|(iy, ix)| ((iy - y).abs() + 1) * ((ix - x).abs() + 1))
             .max()
             .expect("could not get max");
 
