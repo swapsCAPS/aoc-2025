@@ -10,5 +10,5 @@ mod day_9;
 mod util;
 
 fn main() {
-    day_9::part_1();
+    day_9::part_2();
 }
