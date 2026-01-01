@@ -204,147 +204,159 @@ pub fn part_2() {
 }
 
 /*
- * This approach was an attempt to do a form of collision wall etection, but I got stuck and
- * decided to use full range checking instead. I'm fairly certain the first approach would have
- * been much faster though.
+ * This approach was an attempt to do a form of ray casting, but I got stuck and decided to use
+ * full range checking instead. I'm fairly certain the first approach would have been much faster
+ * though.
+ *
+ * This approach assumes a "blob" with no towers/bridges/gaps
+ * For example:
+ *
+ *    #XX#
+ *    X  X
+ *    X  #XX#
+ *  #X#     X
+ *  X     #X#
+ *  #XX#  X
+ *     X  X
+ *     #XX#
  */
-// pub fn part_2_doing_way_too_moeilijk() {
-//     let binding = fs::read_to_string("inputs/day-9.txt").expect("Could not read file");
-//     let content = binding.trim();
-//
-//     let points: Vec<(i64, i64)> = content
-//         .lines()
-//         .map(|l| l.trim())
-//         .map(|l| l.split(","))
-//         .map(|l| l.map(|s| s.parse::<i64>().expect("could not parse")))
-//         .map(|l| l.collect::<Vec<i64>>())
-//         .map(|l| (l[0], l[1]))
-//         .collect();
-//
-//     // We only have two X points per Y and two Y points per X!
-//
-//     let (xs, ys): (HashMap<i64, HashSet<i64>>, HashMap<i64, HashSet<i64>>) =
-//         points
-//             .iter()
-//             .fold((HashMap::new(), HashMap::new()), |mut acc, (x, y)| {
-//                 if acc.0.contains_key(&x) {
-//                     acc.0.get_mut(x).expect("get mut x ouch").insert(*y);
-//                 } else {
-//                     acc.0.insert(*x, HashSet::from_iter(vec![*y]));
-//                 }
-//                 if acc.1.contains_key(&y) {
-//                     acc.1.get_mut(y).expect("get mut y ouch").insert(*x);
-//                 } else {
-//                     acc.1.insert(*y, HashSet::from_iter(vec![*x]));
-//                 }
-//                 return acc;
-//             });
-//
-//     let walls_hori: HashMap<i64, RangeInclusive<i64>, BuildHasherDefault<DefaultHasher>> =
-//         HashMap::from_iter(xs.iter().map(|(k, v)| {
-//             let mut pts: Vec<&i64> = v.iter().collect();
-//             pts.sort_by(|a, b| b.cmp(a));
-//             (*k, *pts[0]..=*pts[1])
-//         }));
-//     let walls_vert: HashMap<i64, RangeInclusive<i64>, BuildHasherDefault<DefaultHasher>> =
-//         HashMap::from_iter(ys.iter().map(|(k, v)| {
-//             let mut pts: Vec<&i64> = v.iter().collect();
-//             pts.sort_by(|a, b| b.cmp(a));
-//             (*k, *pts[0]..=*pts[1])
-//         }));
-//
-//     let result = points.iter().fold(0, |acc, (x, y)| {
-//         let points_down: Vec<&(i64, i64)> = points.iter().filter(|(_, iy)| iy >= y).collect();
-//
-//         let below = points_down.iter().find(|(iix, iiy)| iix == x && iiy > y);
-//
-//         // This is wrong
-//         if below.is_none() {
-//             return acc;
-//         }
-//
-//         let below = below.unwrap();
-//
-//         let left = points_down.iter().find(|(iix, iiy)| iiy == y && iix < x);
-//         let right = points_down.iter().find(|(iix, iiy)| iiy == y && iix > x);
-//
-//         let walls_right = walls_vert
-//             .iter()
-//             .filter(|(k, r)| k > &x && r.contains(y))
-//             .map(|(k, v)| k);
-//
-//         let points_down: Vec<&(i64, i64)> = points.iter().filter(|(_, iy)| iy >= y).collect();
-//
-//         let below = points_down.iter().find(|(iix, iiy)| iix == x && iiy > y);
-//
-//         if below.is_none() {
-//             return acc;
-//         }
-//
-//         let below = below.unwrap();
-//
-//         let left = points_down.iter().find(|(iix, iiy)| iiy == y && iix < x);
-//         let right = points_down.iter().find(|(iix, iiy)| iiy == y && iix > x);
-//         let max = [
-//             // down left
-//             points_down
-//                 .iter()
-//                 .find(|(iix, iiy)| iix < &below.0 && iiy == &below.1),
-//             // down right
-//             points_down
-//                 .iter()
-//                 .find(|(iix, iiy)| iix > &below.0 && iiy == &below.1),
-//             // left down
-//             if left.is_some() {
-//                 let l = left.unwrap();
-//                 let left_down = points_down
-//                     .iter()
-//                     .find(|(iix, iiy)| iix == &l.0 && iiy > &l.1);
-//                 if let Some(ld) = left_down {
-//                     if ld.1 > below.1 { None } else { left_down }
-//                 } else {
-//                     None
-//                 }
-//             } else {
-//                 None
-//             },
-//             // right down
-//             if right.is_some() {
-//                 let r = right.unwrap();
-//                 let right_down = points_down
-//                     .iter()
-//                     .find(|(iix, iiy)| iix == &r.0 && iiy > &r.1);
-//                 if let Some(rd) = right_down {
-//                     if rd.1 > below.1 { None } else { right_down }
-//                 } else {
-//                     None
-//                 }
-//             } else {
-//                 None
-//             },
-//         ]
-//         .iter()
-//         .filter(|item| item.is_some())
-//         .map(|item| item.unwrap())
-//         .map(|(ix, iy)| {
-//             let result = ((ix - x).abs() + 1) * ((iy - y).abs() + 1);
-//             println!("{}:{} {}:{} = {}", x, y, ix, iy, result);
-//             result
-//         })
-//         .max()
-//         .expect("could not get max");
-//
-//         println!("{}:{} {}", y, x, max);
-//
-//         if max > acc {
-//             return max;
-//         }
-//
-//         return acc;
-//     });
-//
-//     println!("{}", result)
-// }
+pub fn part_2_doing_way_too_moeilijk() {
+    let binding = fs::read_to_string("inputs/day-9.txt").expect("Could not read file");
+    let content = binding.trim();
+
+    let points: Vec<(i64, i64)> = content
+        .lines()
+        .map(|l| l.trim())
+        .map(|l| l.split(","))
+        .map(|l| l.map(|s| s.parse::<i64>().expect("could not parse")))
+        .map(|l| l.collect::<Vec<i64>>())
+        .map(|l| (l[0], l[1]))
+        .collect();
+
+    // We only have two X points per Y and two Y points per X!
+
+    let (xs, ys): (HashMap<i64, HashSet<i64>>, HashMap<i64, HashSet<i64>>) =
+        points
+            .iter()
+            .fold((HashMap::new(), HashMap::new()), |mut acc, (x, y)| {
+                if acc.0.contains_key(&x) {
+                    acc.0.get_mut(x).expect("get mut x ouch").insert(*y);
+                } else {
+                    acc.0.insert(*x, HashSet::from_iter(vec![*y]));
+                }
+                if acc.1.contains_key(&y) {
+                    acc.1.get_mut(y).expect("get mut y ouch").insert(*x);
+                } else {
+                    acc.1.insert(*y, HashSet::from_iter(vec![*x]));
+                }
+                return acc;
+            });
+
+    let walls_hori: HashMap<i64, RangeInclusive<i64>, BuildHasherDefault<DefaultHasher>> =
+        HashMap::from_iter(ys.iter().map(|(k, v)| {
+            let mut pts: Vec<&i64> = v.iter().collect();
+            pts.sort_by(|a, b| b.cmp(a));
+            (*k, *pts[0]..=*pts[1])
+        }));
+    let walls_vert: HashMap<i64, RangeInclusive<i64>, BuildHasherDefault<DefaultHasher>> =
+        HashMap::from_iter(xs.iter().map(|(k, v)| {
+            let mut pts: Vec<&i64> = v.iter().collect();
+            pts.sort_by(|a, b| b.cmp(a));
+            (*k, *pts[0]..=*pts[1])
+        }));
+
+    let result = points.iter().fold(0, |acc, (x, y)| {
+        let points_down: Vec<&(i64, i64)> = points.iter().filter(|(_, iy)| iy >= y).collect();
+
+        let below = points_down.iter().find(|(iix, iiy)| iix == x && iiy > y);
+
+        // This is wrong
+        if below.is_none() {
+            return acc;
+        }
+
+        let below = below.unwrap();
+
+        let left = points_down.iter().find(|(iix, iiy)| iiy == y && iix < x);
+        let right = points_down.iter().find(|(iix, iiy)| iiy == y && iix > x);
+
+        let walls_right = walls_vert
+            .iter()
+            .filter(|(k, r)| k > &x && r.contains(y))
+            .map(|(k, v)| k);
+
+        let points_down: Vec<&(i64, i64)> = points.iter().filter(|(_, iy)| iy >= y).collect();
+
+        let below = points_down.iter().find(|(iix, iiy)| iix == x && iiy > y);
+
+        if below.is_none() {
+            return acc;
+        }
+
+        let below = below.unwrap();
+
+        let left = points_down.iter().find(|(iix, iiy)| iiy == y && iix < x);
+        let right = points_down.iter().find(|(iix, iiy)| iiy == y && iix > x);
+        let max = [
+            // down left
+            points_down
+                .iter()
+                .find(|(iix, iiy)| iix < &below.0 && iiy == &below.1),
+            // down right
+            points_down
+                .iter()
+                .find(|(iix, iiy)| iix > &below.0 && iiy == &below.1),
+            // left down
+            if left.is_some() {
+                let l = left.unwrap();
+                let left_down = points_down
+                    .iter()
+                    .find(|(iix, iiy)| iix == &l.0 && iiy > &l.1);
+                if let Some(ld) = left_down {
+                    if ld.1 > below.1 { None } else { left_down }
+                } else {
+                    None
+                }
+            } else {
+                None
+            },
+            // right down
+            if right.is_some() {
+                let r = right.unwrap();
+                let right_down = points_down
+                    .iter()
+                    .find(|(iix, iiy)| iix == &r.0 && iiy > &r.1);
+                if let Some(rd) = right_down {
+                    if rd.1 > below.1 { None } else { right_down }
+                } else {
+                    None
+                }
+            } else {
+                None
+            },
+        ]
+        .iter()
+        .filter(|item| item.is_some())
+        .map(|item| item.unwrap())
+        .map(|(ix, iy)| {
+            let result = ((ix - x).abs() + 1) * ((iy - y).abs() + 1);
+            println!("{}:{} {}:{} = {}", x, y, ix, iy, result);
+            result
+        })
+        .max()
+        .expect("could not get max");
+
+        println!("{}:{} {}", y, x, max);
+
+        if max > acc {
+            return max;
+        }
+
+        return acc;
+    });
+
+    println!("{}", result)
+}
 
 #[cfg(test)]
 mod tests {
