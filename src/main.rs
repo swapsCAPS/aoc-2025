@@ -7,8 +7,9 @@ mod day_6;
 mod day_7;
 mod day_8;
 mod day_9;
+mod infi_2025;
 mod util;
 
 fn main() {
-    day_9::part_2();
+    infi_2025::part_1();
 }
