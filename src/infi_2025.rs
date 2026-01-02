@@ -1,13 +1,13 @@
-use std::{fmt, fs, ops::Deref};
+use std::{collections::HashMap, fmt, fs, ops::Deref};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
-enum CellType {
+pub enum CellType {
     Tree,
     Blank,
 }
 
-#[derive(Debug, Copy, Clone)]
-struct Cell {
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct Cell {
     cell_type: CellType,
     height: Option<u8>,
 }
@@ -23,6 +23,89 @@ impl fmt::Display for Cell {
             write!(f, "x")
         }
     }
+}
+
+/*
+ * Using zip here has the nice benefit
+ */
+pub fn get_diag_rows_by_pos(
+    angle: i16,
+    x: usize,
+    y: usize,
+    columns: &Vec<Vec<Cell>>,
+) -> (Vec<((usize, usize), Cell)>, Vec<((usize, usize), Cell)>) {
+    let row_count = columns[0].len();
+    let (left, right) = match angle {
+        0 => (
+            (0..=x)
+                .rev()
+                .zip((0..=y).rev())
+                .map(|(ix, iy)| ((ix, iy), columns[ix][iy]))
+                .collect(),
+            (x..columns.len())
+                .zip((0..=y).rev())
+                .map(|(ix, iy)| ((ix, iy), columns[ix][iy]))
+                .collect(),
+        ),
+        90 => (
+            (x..columns.len())
+                .zip((0..=y).rev())
+                .map(|(ix, iy)| ((ix, iy), columns[ix][iy]))
+                .collect(),
+            (x..columns.len())
+                .zip(y..row_count)
+                .map(|(ix, iy)| ((ix, iy), columns[ix][iy]))
+                .collect(),
+        ),
+        180 => (
+            (x..columns.len())
+                .zip(y..row_count)
+                .map(|(ix, iy)| ((ix, iy), columns[ix][iy]))
+                .collect(),
+            (0..=x)
+                .rev()
+                .zip(y..row_count)
+                .map(|(ix, iy)| ((ix, iy), columns[ix][iy]))
+                .collect(),
+        ),
+        270 => (
+            (0..=x)
+                .rev()
+                .zip(y..row_count)
+                .map(|(ix, iy)| ((ix, iy), columns[ix][iy]))
+                .collect(),
+            (0..=x)
+                .rev()
+                .zip((0..=y).rev())
+                .map(|(ix, iy)| ((ix, iy), columns[ix][iy]))
+                .collect(),
+        ),
+        _ => panic!("unknown angle"),
+    };
+
+    (left, right)
+}
+
+pub fn check_fluorescence(
+    line: Vec<((usize, usize), Cell)>,
+    gets_light_map: &HashMap<(usize, usize), bool>,
+) -> bool {
+    if line.len() <= 1 {
+        return false;
+    }
+
+    let gets_light = line
+        .iter()
+        .enumerate()
+        .skip(1)
+        .filter(|(_, cell)| *gets_light_map.get(&cell.0).unwrap())
+        .any(|(pos, fluor_tree)| {
+            line[1..pos].iter().all(|tree| {
+                tree.1.height.unwrap_or_default() < fluor_tree.1.height.unwrap_or_default()
+            })
+        });
+
+    gets_light
 }
 
 pub fn part_1() {
@@ -128,12 +211,14 @@ pub fn part_1() {
     let mut cut_down_trees = 0;
 
     let mut angle = 0_i16;
-    for day in 0..256 {
+    for day in 0..8 {
         println!("{} {}", day, angle);
         let prev_state = columns.clone();
 
+        let mut gets_light_map = HashMap::new();
+
+        // Would be nicer to start storing state per cell...
         for x in 0..columns.len() {
-            // for (x, column) in columns.iter().map(|c|).enumerate() {
             for y in 0..columns[x].len() {
                 if prev_state[x][y].cell_type != CellType::Tree {
                     continue;
@@ -158,6 +243,44 @@ pub fn part_1() {
                     ch == 0 || ch < prev_state[x][y].height.unwrap_or_default()
                 });
 
+                gets_light_map.insert((x, y), gets_light);
+            }
+        }
+
+        for x in 0..columns.len() {
+            for y in 0..columns[x].len() {
+                if prev_state[x][y].cell_type != CellType::Tree {
+                    continue;
+                }
+
+                for y in 0..columns.len() {
+                    let row = get_row(y, &prev_state);
+                    let s = row.iter().map(|c| c.to_string()).collect::<String>();
+                    println!("{}", s)
+                }
+
+                println!("{} Doing: {}:{} = {}", angle, x, y, prev_state[x][y]);
+
+                let (left, right) = get_diag_rows_by_pos(angle, x, y, &prev_state);
+
+                println!("left");
+                for ((x, y), c) in &left {
+                    println!("{}:{}, {} {:?}", x, y, c, gets_light_map.get(&(*x, *y)));
+                }
+                println!("right");
+                for ((x, y), c) in &right {
+                    println!("{}:{}, {} {:?}", x, y, c, gets_light_map.get(&(*x, *y)));
+                }
+
+                let gets_fluoresence = check_fluorescence(left, &gets_light_map)
+                    || check_fluorescence(right, &gets_light_map);
+
+                if gets_fluoresence {
+                    println!("{}:{} gets_fluoresence", x, y);
+                }
+
+                let gets_light = *gets_light_map.get(&(x, y)).unwrap();
+
                 if prev_state[x][y].height.is_none() {
                     let neighbor_count: Vec<Cell> = get_neighbors(x, y, &prev_state)
                         .iter()
@@ -167,14 +290,13 @@ pub fn part_1() {
                         .filter(|c| c.height.unwrap_or(0) >= 2)
                         .collect();
 
-                    if gets_light && neighbor_count.len() >= 2 {
-                        println!("{}:{} sprouted", x, y);
+                    if (gets_fluoresence || gets_light) && neighbor_count.len() >= 2 {
                         columns[x][y].height = Some(0);
                     }
                     continue;
                 }
 
-                if gets_light {
+                if gets_light || gets_fluoresence {
                     columns[x][y].height = Some(prev_state[x][y].height.unwrap() + 1)
                 }
 
@@ -199,5 +321,260 @@ pub fn part_1() {
         }
 
         println!("{}", cut_down_trees);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use super::{Cell, CellType, check_fluorescence, get_diag_rows_by_pos};
+
+    const COLUMNS: [&'static [Cell; 4]; 4] = [
+        &[
+            Cell {
+                cell_type: CellType::Tree,
+                height: Some(11),
+            },
+            Cell {
+                cell_type: CellType::Tree,
+                height: Some(21),
+            },
+            Cell {
+                cell_type: CellType::Tree,
+                height: Some(31),
+            },
+            Cell {
+                cell_type: CellType::Tree,
+                height: Some(41),
+            },
+        ],
+        &[
+            Cell {
+                cell_type: CellType::Tree,
+                height: Some(12),
+            },
+            Cell {
+                cell_type: CellType::Tree,
+                height: Some(22),
+            },
+            Cell {
+                cell_type: CellType::Tree,
+                height: Some(32),
+            },
+            Cell {
+                cell_type: CellType::Tree,
+                height: Some(42),
+            },
+        ],
+        &[
+            Cell {
+                cell_type: CellType::Tree,
+                height: Some(13),
+            },
+            Cell {
+                cell_type: CellType::Tree,
+                height: Some(23),
+            },
+            Cell {
+                cell_type: CellType::Tree,
+                height: Some(33),
+            },
+            Cell {
+                cell_type: CellType::Tree,
+                height: Some(43),
+            },
+        ],
+        &[
+            Cell {
+                cell_type: CellType::Tree,
+                height: Some(14),
+            },
+            Cell {
+                cell_type: CellType::Tree,
+                height: Some(24),
+            },
+            Cell {
+                cell_type: CellType::Tree,
+                height: Some(34),
+            },
+            Cell {
+                cell_type: CellType::Tree,
+                height: Some(44),
+            },
+        ],
+    ];
+
+    /*
+     *   0  1  2  3
+     * 0 11 12 13 14
+     * 1 21 22 23 24
+     * 2 31 32 33 34
+     * 3 41 42 43 44
+     */
+
+    fn get_height(c: &Cell) -> u8 {
+        c.height.unwrap()
+    }
+
+    fn parse_result(
+        result: (Vec<((usize, usize), Cell)>, Vec<((usize, usize), Cell)>),
+    ) -> (Vec<u8>, Vec<u8>) {
+        (
+            result
+                .0
+                .iter()
+                .map(|(_, cell)| get_height(cell))
+                .collect::<Vec<u8>>(),
+            result
+                .1
+                .iter()
+                .map(|(_, cell)| get_height(cell))
+                .collect::<Vec<u8>>(),
+        )
+    }
+
+    #[test]
+    fn north() {
+        let v: Vec<Vec<Cell>> = COLUMNS.to_vec().iter().map(|c| c.to_vec()).collect();
+
+        let result = parse_result(get_diag_rows_by_pos(0, 2, 0, &v));
+        assert_eq!(result, (vec![13], vec![13]));
+
+        let result = parse_result(get_diag_rows_by_pos(0, 2, 1, &v));
+        assert_eq!(result, (vec![23, 12], vec![23, 14]));
+
+        let result = parse_result(get_diag_rows_by_pos(0, 1, 1, &v));
+        assert_eq!(result, (vec![22, 11], vec![22, 13]));
+
+        let result = parse_result(get_diag_rows_by_pos(0, 0, 2, &v));
+        assert_eq!(result, (vec![31], vec![31, 22, 13]));
+
+        let result = parse_result(get_diag_rows_by_pos(0, 3, 3, &v));
+        assert_eq!(result, (vec![44, 33, 22, 11], vec![44]));
+
+        let result = parse_result(get_diag_rows_by_pos(0, 3, 2, &v));
+        assert_eq!(result, (vec![34, 23, 12], vec![34]));
+    }
+
+    #[test]
+    fn east() {
+        let v: Vec<Vec<Cell>> = COLUMNS.to_vec().iter().map(|c| c.to_vec()).collect();
+
+        let result = parse_result(get_diag_rows_by_pos(90, 1, 1, &v));
+        assert_eq!(result, (vec![22, 13], vec![22, 33, 44]));
+
+        let result = parse_result(get_diag_rows_by_pos(90, 0, 2, &v));
+        assert_eq!(result, (vec![31, 22, 13], vec![31, 42]));
+
+        let result = parse_result(get_diag_rows_by_pos(90, 2, 3, &v));
+        assert_eq!(result, (vec![43, 34], vec![43]));
+
+        let result = parse_result(get_diag_rows_by_pos(90, 2, 2, &v));
+        assert_eq!(result, (vec![33, 24], vec![33, 44]));
+    }
+
+    #[test]
+    fn south() {
+        let v: Vec<Vec<Cell>> = COLUMNS.to_vec().iter().map(|c| c.to_vec()).collect();
+
+        let result = parse_result(get_diag_rows_by_pos(180, 2, 2, &v));
+        assert_eq!(result, (vec![33, 44], vec![33, 42]));
+
+        let result = parse_result(get_diag_rows_by_pos(180, 0, 2, &v));
+        assert_eq!(result, (vec![31, 42], vec![31]));
+
+        let result = parse_result(get_diag_rows_by_pos(180, 2, 3, &v));
+        assert_eq!(result, (vec![43], vec![43]));
+
+        let result = parse_result(get_diag_rows_by_pos(180, 2, 2, &v));
+        assert_eq!(result, (vec![33, 44], vec![33, 42]));
+    }
+
+    #[test]
+    fn west() {
+        let v: Vec<Vec<Cell>> = COLUMNS.to_vec().iter().map(|c| c.to_vec()).collect();
+
+        let result = parse_result(get_diag_rows_by_pos(270, 1, 1, &v));
+        assert_eq!(result, (vec![22, 31], vec![22, 11]));
+
+        let result = parse_result(get_diag_rows_by_pos(270, 0, 2, &v));
+        assert_eq!(result, (vec![31], vec![31]));
+
+        let result = parse_result(get_diag_rows_by_pos(270, 2, 3, &v));
+        assert_eq!(result, (vec![43], vec![43, 32, 21]));
+
+        let result = parse_result(get_diag_rows_by_pos(270, 2, 2, &v));
+        assert_eq!(result, (vec![33, 42], vec![33, 22, 11]));
+
+        let result = parse_result(get_diag_rows_by_pos(270, 3, 1, &v));
+        assert_eq!(result, (vec![24, 33, 42], vec![24, 13]));
+    }
+
+    #[test]
+    fn gets_fluorescence() {
+        fn fixture(test_line: Vec<(bool, Option<u8>)>) -> bool {
+            let line: Vec<((usize, usize), Cell)> = test_line
+                .iter()
+                .enumerate()
+                .map(|(idx, (_, height))| {
+                    (
+                        (0, idx),
+                        Cell {
+                            cell_type: CellType::Tree,
+                            height: *height,
+                        },
+                    )
+                })
+                .collect();
+
+            let gets_light_map: HashMap<(usize, usize), bool> = HashMap::from_iter(
+                test_line
+                    .iter()
+                    .enumerate()
+                    .map(|(idx, (gets_light, _))| ((0, idx), *gets_light))
+                    .collect::<Vec<((usize, usize), bool)>>(),
+            );
+
+            check_fluorescence(line, &gets_light_map)
+        }
+
+        assert_eq!(
+            fixture(vec![(false, Some(1)), (false, None), (false, None)]),
+            false
+        );
+        assert_eq!(
+            fixture(vec![(false, Some(1)), (false, None), (true, Some(1))]),
+            true
+        );
+        assert_eq!(
+            fixture(vec![(false, Some(2)), (false, None), (true, Some(1))]),
+            true
+        );
+        assert_eq!(
+            fixture(vec![(false, Some(1)), (false, Some(1)), (true, Some(1))]),
+            false
+        );
+        assert_eq!(
+            fixture(vec![(false, Some(2)), (false, Some(1)), (true, Some(2))]),
+            true
+        );
+        assert_eq!(
+            fixture(vec![(false, Some(3)), (false, Some(1)), (true, Some(2))]),
+            true
+        );
+        assert_eq!(
+            fixture(vec![
+                (false, Some(4)),
+                (false, Some(3)),
+                (false, Some(2)),
+                (true, Some(2)),
+                (true, Some(3)),
+                (true, Some(4)),
+                (false, Some(4)),
+                (true, Some(4)),
+            ]),
+            true
+        );
     }
 }
