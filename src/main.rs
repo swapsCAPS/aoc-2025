@@ -11,5 +11,5 @@ mod infi_2025;
 mod util;
 
 fn main() {
-    infi_2025::part_1();
+    infi_2025::part_2();
 }
